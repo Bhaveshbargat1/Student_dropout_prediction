@@ -1,55 +1,50 @@
 import joblib
 import pandas as pd
 
-# -------------------------
-# Load Saved Files
-# -------------------------
+# ---------------------------------------
+# Load Saved Objects
+# ---------------------------------------
 
 model = joblib.load("model/student_dropout_model.pkl")
 feature_names = joblib.load("model/feature_names.pkl")
 label_encoders = joblib.load("model/label_encoders.pkl")
+target_encoder = joblib.load("model/target_encoder.pkl")
 
 
-def preprocess_input(input_data):
+def preprocess_input(input_dict):
     """
-    Converts categorical values using saved LabelEncoders
+    Convert user input into a DataFrame that matches the
+    training data format.
     """
 
-    data = input_data.copy()
+    df = pd.DataFrame([input_dict])
 
+    # Encode categorical columns if needed
     for column, encoder in label_encoders.items():
 
-        if column in data.columns:
+        if column in df.columns:
 
-            data[column] = encoder.transform(data[column])
+            df[column] = encoder.transform(df[column])
 
-    return data
-
-
-def predict_student(student_data):
-    """
-    Predict student dropout
-    """
-
-    df = pd.DataFrame([student_data])
-
-    df = preprocess_input(df)
-
-    # Arrange columns in correct order
+    # Arrange columns exactly like training
     df = df[feature_names]
 
-    prediction = model.predict(df)[0]
+    return df
 
-    probability = model.predict_proba(df)[0]
+
+def predict_student(input_dict):
+    """
+    Predict Dropout / Graduate
+    """
+
+    processed_data = preprocess_input(input_dict)
+
+    prediction = model.predict(processed_data)[0]
+
+    probability = model.predict_proba(processed_data)[0]
 
     confidence = round(max(probability) * 100, 2)
 
-    if prediction == 1:
+    predicted_label = target_encoder.inverse_transform([prediction])[0]
 
-        result = "Dropout"
-
-    else:
-
-        result = "Graduate"
-
-    return result, confidence
+    return predicted_label, confidence
