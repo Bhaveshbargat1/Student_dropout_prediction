@@ -1,56 +1,102 @@
+# ============================================
+# Student Dropout Prediction System
+# Train Model
+# ============================================
+
 import os
+import warnings
 import joblib
 import pandas as pd
+import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    GradientBoostingClassifier
+)
 
-# -----------------------------------
-# Create model directory
-# -----------------------------------
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix
+)
+
+warnings.filterwarnings("ignore")
+
+# ============================================
+# Create Required Directories
+# ============================================
+
 os.makedirs("model", exist_ok=True)
 
-# -----------------------------------
+# ============================================
 # Load Dataset
-# -----------------------------------
-df = pd.read_csv("data/student_dropout.csv", sep=";")
+# ============================================
+
+DATA_PATH = "data/student_dropout.csv"
 
 print("=" * 60)
-print("Dataset Loaded Successfully")
+print("Loading Dataset...")
 print("=" * 60)
+
+df = pd.read_csv(DATA_PATH, sep=";")
+
+print("\nDataset Loaded Successfully\n")
+
 print(df.head())
 
-# -----------------------------------
-# Remove missing values
-# -----------------------------------
+print("\nShape :", df.shape)
+
+# ============================================
+# Remove Missing Values
+# ============================================
+
 df.dropna(inplace=True)
 
-# -----------------------------------
-# Remove Enrolled students
-# Keep only Graduate and Dropout
-# -----------------------------------
+print("\nMissing Values Removed")
+
+# ============================================
+# Remove Enrolled Students
+# ============================================
+
 df = df[df["Target"] != "Enrolled"]
 
-# -----------------------------------
+print("Enrolled Students Removed")
+
+# ============================================
 # Encode Target
-# Graduate = 0
-# Dropout = 1
-# -----------------------------------
+# Graduate -> 0
+# Dropout -> 1
+# ============================================
+
 target_encoder = LabelEncoder()
 
 df["Target"] = target_encoder.fit_transform(df["Target"])
 
-# -----------------------------------
-# Encode categorical columns
-# -----------------------------------
+# ============================================
+# Save Target Encoder
+# ============================================
+
+joblib.dump(
+    target_encoder,
+    "model/target_encoder.pkl"
+)
+
+print("Target Encoder Saved")
+
+# ============================================
+# Encode Categorical Columns
+# ============================================
+
 label_encoders = {}
 
-categorical_columns = df.select_dtypes(include=["object"]).columns
+categorical_columns = df.select_dtypes(
+    include=["object"]
+).columns
 
 for column in categorical_columns:
 
@@ -62,32 +108,99 @@ for column in categorical_columns:
 
         label_encoders[column] = encoder
 
-# -----------------------------------
-# Features & Target
-# -----------------------------------
+print("Categorical Columns Encoded")
+
+# ============================================
+# Save Label Encoders
+# ============================================
+
+joblib.dump(
+    label_encoders,
+    "model/label_encoders.pkl"
+)
+
+print("Label Encoders Saved")
+
+# ============================================
+# Split Features and Target
+# ============================================
+
 X = df.drop("Target", axis=1)
 
 y = df["Target"]
 
-# -----------------------------------
-# Train Test Split
-# -----------------------------------
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.20,
-    random_state=42,
-    stratify=y
+# ============================================
+# Save Feature Names
+# ============================================
+
+feature_names = list(X.columns)
+
+joblib.dump(
+    feature_names,
+    "model/feature_names.pkl"
 )
 
-# -----------------------------------
-# Models
-# -----------------------------------
+print("Feature Names Saved")
+
+# ============================================
+# Save Default Values
+# ============================================
+
+default_values = {}
+
+for column in X.columns:
+
+    if X[column].dtype == object:
+
+        default_values[column] = X[column].mode()[0]
+
+    else:
+
+        default_values[column] = float(
+            X[column].median()
+        )
+
+joblib.dump(
+    default_values,
+    "model/default_values.pkl"
+)
+
+print("Default Values Saved")
+
+# ============================================
+# Train Test Split
+# ============================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+
+    X,
+    y,
+
+    test_size=0.20,
+
+    random_state=42,
+
+    stratify=y
+
+)
+
+print("\nTraining Samples :", len(X_train))
+print("Testing Samples  :", len(X_test))
+
+# ============================================
+# Machine Learning Models
+# ============================================
+
 models = {
 
-    "Logistic Regression": LogisticRegression(max_iter=2000),
+    "Logistic Regression": LogisticRegression(
+        max_iter=2000,
+        random_state=42
+    ),
 
-    "Decision Tree": DecisionTreeClassifier(random_state=42),
+    "Decision Tree": DecisionTreeClassifier(
+        random_state=42
+    ),
 
     "Random Forest": RandomForestClassifier(
         n_estimators=300,
@@ -101,65 +214,225 @@ models = {
 }
 
 best_model = None
-best_accuracy = 0
 best_model_name = ""
+best_accuracy = 0
 
-print("\nTraining Models...\n")
+results = []
+
+print("\n" + "=" * 60)
+print("Training Machine Learning Models")
+print("=" * 60)
 
 for name, model in models.items():
+
+    print(f"\nTraining {name}...")
 
     model.fit(X_train, y_train)
 
     predictions = model.predict(X_test)
 
-    accuracy = accuracy_score(y_test, predictions)
+    accuracy = accuracy_score(
+        y_test,
+        predictions
+    )
 
-    print(f"{name} Accuracy : {accuracy:.4f}")
+    results.append({
+
+        "Model": name,
+        "Accuracy": round(accuracy * 100, 2)
+
+    })
+
+    print(f"Accuracy : {accuracy * 100:.2f}%")
 
     if accuracy > best_accuracy:
 
         best_accuracy = accuracy
+
         best_model = model
+
         best_model_name = name
 
 print("\n" + "=" * 60)
-print("Best Model :", best_model_name)
-print("Accuracy   :", round(best_accuracy * 100, 2), "%")
+print("Model Comparison")
 print("=" * 60)
 
-# -----------------------------------
+results_df = pd.DataFrame(results)
+
+print(results_df)
+
+print("\nBest Model :", best_model_name)
+
+print("Best Accuracy :", round(best_accuracy * 100, 2), "%")
+
+# ============================================
+# Final Prediction
+# ============================================
+
+y_pred = best_model.predict(X_test)
+
+# ============================================
 # Classification Report
-# -----------------------------------
-predictions = best_model.predict(X_test)
+# ============================================
 
-print("\nClassification Report\n")
+print("\n" + "=" * 60)
+print("Classification Report")
+print("=" * 60)
 
-print(classification_report(y_test, predictions))
+report = classification_report(
+    y_test,
+    y_pred
+)
 
-# -----------------------------------
-# Save Model
-# -----------------------------------
-joblib.dump(best_model, "model/student_dropout_model.pkl")
-joblib.dump(target_encoder, "model/target_encoder.pkl")
-joblib.dump(label_encoders, "model/label_encoders.pkl")
-joblib.dump(list(X.columns), "model/feature_names.pkl")
+print(report)
 
-print("\nModel Saved Successfully!")
+with open(
+    "model/classification_report.txt",
+    "w"
+) as file:
 
-# -----------------------------------
-# Save Default Values
-# -----------------------------------
+    file.write(report)
 
-default_values = {}
+# ============================================
+# Confusion Matrix
+# ============================================
 
-for column in X.columns:
+cm = confusion_matrix(
+    y_test,
+    y_pred
+)
 
-    if X[column].dtype in ["int64", "float64"]:
+cm_df = pd.DataFrame(cm)
 
-        default_values[column] = X[column].median()
+cm_df.to_csv(
+    "model/confusion_matrix.csv",
+    index=False
+)
 
-    else:
+print("\nConfusion Matrix Saved")
 
-        default_values[column] = X[column].mode()[0]
+# ============================================
+# Save Best Model
+# ============================================
 
-joblib.dump(default_values, "model/default_values.pkl")
+joblib.dump(
+
+    best_model,
+
+    "model/student_dropout_model.pkl"
+
+)
+
+print("\nBest Model Saved Successfully")
+
+# ============================================
+# Save Feature Importance
+# ============================================
+
+print("\n" + "=" * 60)
+print("Saving Feature Importance")
+print("=" * 60)
+
+if best_model_name == "Random Forest":
+
+    importance = pd.DataFrame({
+
+        "Feature": X.columns,
+        "Importance": best_model.feature_importances_
+
+    })
+
+    importance = importance.sort_values(
+        by="Importance",
+        ascending=False
+    )
+
+    importance.to_csv(
+        "model/feature_importance.csv",
+        index=False
+    )
+
+    print("\nTop 10 Important Features\n")
+
+    print(importance.head(10))
+
+else:
+
+    print(
+        "Feature Importance is only available for Random Forest."
+    )
+
+# ============================================
+# Save Model Accuracy
+# ============================================
+
+accuracy_df = pd.DataFrame({
+
+    "Best Model": [best_model_name],
+
+    "Accuracy (%)": [
+
+        round(best_accuracy * 100, 2)
+
+    ]
+
+})
+
+accuracy_df.to_csv(
+
+    "model/model_accuracy.csv",
+
+    index=False
+
+)
+
+print("\nModel Accuracy Saved")
+
+# ============================================
+# Training Summary
+# ============================================
+
+print("\n" + "=" * 60)
+print("TRAINING COMPLETED SUCCESSFULLY")
+print("=" * 60)
+
+print(f"""
+Best Model        : {best_model_name}
+
+Accuracy          : {best_accuracy * 100:.2f} %
+
+Training Samples  : {len(X_train)}
+
+Testing Samples   : {len(X_test)}
+
+Number of Features: {len(feature_names)}
+
+""")
+
+print("=" * 60)
+
+print("Files Saved Successfully")
+
+print("""
+student_dropout_model.pkl
+
+feature_names.pkl
+
+label_encoders.pkl
+
+target_encoder.pkl
+
+default_values.pkl
+
+classification_report.txt
+
+confusion_matrix.csv
+
+feature_importance.csv
+
+model_accuracy.csv
+""")
+
+print("=" * 60)
+print("Project Ready For Streamlit")
+print("=" * 60)
