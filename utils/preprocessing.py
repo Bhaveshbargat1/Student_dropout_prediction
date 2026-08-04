@@ -10,18 +10,14 @@ import pandas as pd
 
 def load_dataset(file_path):
     """
-    Load the student dropout dataset.
-
-    Parameters
-    ----------
-    file_path : str
-        Path to CSV file.
-
-    Returns
-    -------
-    pandas.DataFrame
+    Load the dataset and clean column names.
     """
+
     df = pd.read_csv(file_path, sep=";")
+
+    # Remove hidden spaces and tab characters
+    df.columns = df.columns.str.strip()
+
     return df
 
 
