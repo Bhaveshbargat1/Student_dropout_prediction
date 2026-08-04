@@ -1,76 +1,9 @@
-import streamlit as st
-import pandas as pd
-import joblib
-import os
-
-from predict import predict_student
-
-# ----------------------------------------
-# Page Configuration
-# ----------------------------------------
-
-st.set_page_config(
-    page_title="Student Dropout Prediction",
-    page_icon="🎓",
-    layout="wide"
-)
-
-# ----------------------------------------
-# Load Saved Files
-# ----------------------------------------
-
-DATA_PATH = "data/student_dropout.csv"
-
-MODEL_PATH = "model/student_dropout_model.pkl"
-DEFAULT_VALUES_PATH = "model/default_values.pkl"
-
-try:
-    model = joblib.load(MODEL_PATH)
-    default_values = joblib.load(DEFAULT_VALUES_PATH)
-
-except FileNotFoundError:
-
-    st.error("❌ Model files not found.")
-
-    st.info("Please run train_model.py first.")
-
-    st.stop()
-
-# ----------------------------------------
-# Page Title
-# ----------------------------------------
-
-st.title("🎓 Student Dropout Prediction System")
-
-st.markdown(
 """
-This application predicts whether a student is likely to **Graduate**
-or **Drop Out** using Machine Learning.
+app.py
+
+Student Dropout Prediction System
+Developed using Streamlit
 """
-)
-
-st.divider()
-
-# ----------------------------------------
-# Sidebar
-# ----------------------------------------
-
-st.sidebar.title("Navigation")
-
-page = st.sidebar.radio(
-
-    "Select Page",
-
-    [
-
-        "🏠 Home",
-        "📊 Dataset",
-        "🎯 Prediction",
-        "ℹ️ About"
-
-    ]
-
-)
 
 import streamlit as st
 import pandas as pd
@@ -79,230 +12,209 @@ import os
 
 from predict import predict_student
 
-# ----------------------------------------
-# Page Configuration
-# ----------------------------------------
-
-st.set_page_config(
-    page_title="Student Dropout Prediction",
-    page_icon="🎓",
-    layout="wide"
+from utils.preprocessing import (
+    load_dataset,
+    get_dataset_information
 )
 
-# ----------------------------------------
-# Load Saved Files
-# ----------------------------------------
+from utils.helper import (
+    display_dataset,
+    display_dataset_info,
+    plot_target_distribution,
+    plot_feature_importance,
+    show_prediction
+)
+
+# =====================================================
+# Streamlit Configuration
+# =====================================================
+
+st.set_page_config(
+
+    page_title="Student Dropout Prediction System",
+
+    page_icon="🎓",
+
+    layout="wide",
+
+    initial_sidebar_state="expanded"
+
+)
+
+# =====================================================
+# Constants
+# =====================================================
 
 DATA_PATH = "data/student_dropout.csv"
 
-MODEL_PATH = "model/student_dropout_model.pkl"
-DEFAULT_VALUES_PATH = "model/default_values.pkl"
+MODEL_FOLDER = "model"
+
+FEATURE_IMPORTANCE = os.path.join(
+
+    MODEL_FOLDER,
+
+    "feature_importance.csv"
+
+)
+
+DEFAULT_VALUES = os.path.join(
+
+    MODEL_FOLDER,
+
+    "default_values.pkl"
+
+)
+
+# =====================================================
+# Load Dataset
+# =====================================================
 
 try:
-    model = joblib.load(MODEL_PATH)
-    default_values = joblib.load(DEFAULT_VALUES_PATH)
 
-except FileNotFoundError:
+    df = load_dataset(DATA_PATH)
 
-    st.error("❌ Model files not found.")
+except Exception as e:
 
-    st.info("Please run train_model.py first.")
+    st.error(f"Dataset Error : {e}")
 
     st.stop()
 
-# ----------------------------------------
-# Page Title
-# ----------------------------------------
+# =====================================================
+# Load Default Values
+# =====================================================
 
-st.title("🎓 Student Dropout Prediction System")
+try:
 
-st.markdown(
-"""
-This application predicts whether a student is likely to **Graduate**
-or **Drop Out** using Machine Learning.
-"""
-)
+    default_values = joblib.load(DEFAULT_VALUES)
 
-st.divider()
+except Exception:
 
-# ----------------------------------------
-# Sidebar
-# ----------------------------------------
-
-st.sidebar.title("Navigation")
-
-page = st.sidebar.radio(
-
-    "Select Page",
-
-    [
-
-        "🏠 Home",
-        "📊 Dataset",
-        "🎯 Prediction",
-        "ℹ️ About"
-
-    ]
-
-)
-
-# ----------------------------------------
-# PREDICTION PAGE
-# ----------------------------------------
-
-elif page == "🎯 Prediction":
-
-    st.header("Student Dropout Prediction")
-
-    st.write("Enter the student's academic information below.")
-
-    st.divider()
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        course = st.number_input(
-            "Course",
-            min_value=1,
-            max_value=9999,
-            value=9500
-        )
-
-        admission_grade = st.slider(
-            "Admission Grade",
-            0.0,
-            200.0,
-            130.0
-        )
-
-        previous_grade = st.slider(
-            "Previous Qualification Grade",
-            0.0,
-            200.0,
-            130.0
-        )
-
-        age = st.number_input(
-            "Age at Enrollment",
-            17,
-            70,
-            20
-        )
-
-        gender = st.selectbox(
-            "Gender",
-            ["Male", "Female"]
-        )
-
-        debtor = st.selectbox(
-            "Debtor",
-            ["No", "Yes"]
-        )
-
-    with col2:
-
-        tuition = st.selectbox(
-            "Tuition Fees Up To Date",
-            ["Yes", "No"]
-        )
-
-        scholarship = st.selectbox(
-            "Scholarship Holder",
-            ["No", "Yes"]
-        )
-
-        sem1_approved = st.number_input(
-            "1st Semester Approved Subjects",
-            0,
-            20,
-            6
-        )
-
-        sem1_grade = st.slider(
-            "1st Semester Average Grade",
-            0.0,
-            20.0,
-            13.0
-        )
-
-        sem2_approved = st.number_input(
-            "2nd Semester Approved Subjects",
-            0,
-            20,
-            6
-        )
-
-        sem2_grade = st.slider(
-            "2nd Semester Average Grade",
-            0.0,
-            20.0,
-            13.0
-        )
-
-    predict_button = st.button(
-        "Predict Student Status",
-        use_container_width=True
+    st.error(
+        "Model files not found.\nRun train_model.py first."
     )
 
-    if predict_button:
+    st.stop()
 
-        student = default_values.copy()
+# =====================================================
+# Sidebar
+# =====================================================
 
-        student["Course"] = course
-        student["Admission grade"] = admission_grade
-        student["Previous qualification (grade)"] = previous_grade
-        student["Age at enrollment"] = age
+st.sidebar.title("Navigation")
 
-        student["Gender"] = 1 if gender == "Male" else 0
+page = st.sidebar.radio(
 
-        student["Debtor"] = 1 if debtor == "Yes" else 0
+    "Select Page",
 
-        student["Tuition fees up to date"] = (
-            1 if tuition == "Yes" else 0
-        )
+    [
 
-        student["Scholarship holder"] = (
-            1 if scholarship == "Yes" else 0
-        )
+        "🏠 Home",
 
-        student["Curricular units 1st sem (approved)"] = sem1_approved
+        "📊 Dataset",
 
-        student["Curricular units 1st sem (grade)"] = sem1_grade
+        "🎯 Prediction",
 
-        student["Curricular units 2nd sem (approved)"] = sem2_approved
+        "ℹ️ About"
 
-        student["Curricular units 2nd sem (grade)"] = sem2_grade
+    ]
 
-        prediction, confidence = predict_student(student)
+)
 
-        st.divider()
+st.sidebar.markdown("---")
 
-        if prediction == "Graduate":
+st.sidebar.info(
 
-            st.success(
-                f"Prediction : {prediction}"
-            )
+"""
+Student Dropout Prediction
 
-        else:
+B.Tech Mini Project
 
-            st.error(
-                f"Prediction : {prediction}"
-            )
+Artificial Intelligence & Data Science
 
-        st.metric(
-            "Confidence",
-            f"{confidence}%"
-        )
+"""
 
-        if confidence >= 90:
+)
 
-            st.success("High Confidence Prediction")
+# =====================================================
+# HOME PAGE
+# =====================================================
 
-        elif confidence >= 70:
+if page == "🏠 Home":
 
-            st.warning("Moderate Confidence")
+    st.title("🎓 Student Dropout Prediction System")
 
-        else:
+    st.markdown("---")
 
-            st.info("Low Confidence")
+    st.subheader("Project Overview")
+
+    st.write(
+
+"""
+This application predicts whether a student is likely to
+
+- Graduate
+- Dropout
+
+using Machine Learning Classification algorithms.
+
+The objective is to identify students who are at risk
+of dropping out so that educational institutions can
+take preventive actions.
+"""
+
+    )
+
+    st.markdown("---")
+
+    info = get_dataset_information(df)
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric(
+
+        "Rows",
+
+        info["rows"]
+
+    )
+
+    c2.metric(
+
+        "Columns",
+
+        info["columns"]
+
+    )
+
+    c3.metric(
+
+        "Missing Values",
+
+        info["missing_values"]
+
+    )
+
+    c4.metric(
+
+        "Duplicate Rows",
+
+        info["duplicate_rows"]
+
+    )
+
+    st.markdown("---")
+
+    st.subheader("Algorithms Used")
+
+    st.write("""
+
+✔ Logistic Regression
+
+✔ Decision Tree
+
+✔ Random Forest
+
+✔ Gradient Boosting
+
+The application automatically selects the best-performing model during training.
+
+""")
