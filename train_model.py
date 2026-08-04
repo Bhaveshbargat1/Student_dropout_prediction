@@ -81,29 +81,14 @@ joblib.dump(
     "model/target_encoder.pkl"
 )
 
+
 # ==========================================================
-# Encode Categorical Features
+# Input features are already numeric in this dataset.
+# No feature encoding is required.
 # ==========================================================
-
-label_encoders = {}
-
-categorical_columns = df.select_dtypes(
-    include=["object"]
-).columns
-
-for column in categorical_columns:
-
-    if column == "Target":
-        continue
-
-    encoder = LabelEncoder()
-
-    df[column] = encoder.fit_transform(df[column])
-
-    label_encoders[column] = encoder
 
 joblib.dump(
-    label_encoders,
+    {},
     "model/label_encoders.pkl"
 )
 
