@@ -1,13 +1,20 @@
-# ============================================
-# Student Dropout Prediction System
-# Train Model
-# ============================================
+"""
+train_model.py
+
+Student Dropout Prediction System
+---------------------------------
+This script:
+1. Loads the dataset
+2. Preprocesses the data
+3. Trains multiple ML models
+4. Selects the best model
+5. Saves the trained model and metadata
+"""
 
 import os
 import warnings
 import joblib
 import pandas as pd
-import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -25,72 +32,58 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
+from utils.preprocessing import (
+    load_dataset,
+    remove_missing_values,
+    remove_enrolled_students,
+    split_features_target
+)
+
 warnings.filterwarnings("ignore")
 
-# ============================================
-# Create Required Directories
-# ============================================
+# ==========================================================
+# Create Model Directory
+# ==========================================================
 
 os.makedirs("model", exist_ok=True)
 
-# ============================================
+# ==========================================================
 # Load Dataset
-# ============================================
-
-DATA_PATH = "data/student_dropout.csv"
+# ==========================================================
 
 print("=" * 60)
 print("Loading Dataset...")
 print("=" * 60)
 
-df = pd.read_csv(DATA_PATH, sep=";")
+df = load_dataset("data/student_dropout.csv")
 
-print("\nDataset Loaded Successfully\n")
+print(f"Dataset Shape : {df.shape}")
 
-print(df.head())
+# ==========================================================
+# Data Cleaning
+# ==========================================================
 
-print("\nShape :", df.shape)
+df = remove_missing_values(df)
+df = remove_enrolled_students(df)
 
-# ============================================
-# Remove Missing Values
-# ============================================
+print(f"Shape After Cleaning : {df.shape}")
 
-df.dropna(inplace=True)
-
-print("\nMissing Values Removed")
-
-# ============================================
-# Remove Enrolled Students
-# ============================================
-
-df = df[df["Target"] != "Enrolled"]
-
-print("Enrolled Students Removed")
-
-# ============================================
-# Encode Target
-# Graduate -> 0
-# Dropout -> 1
-# ============================================
+# ==========================================================
+# Encode Target Variable
+# ==========================================================
 
 target_encoder = LabelEncoder()
 
 df["Target"] = target_encoder.fit_transform(df["Target"])
-
-# ============================================
-# Save Target Encoder
-# ============================================
 
 joblib.dump(
     target_encoder,
     "model/target_encoder.pkl"
 )
 
-print("Target Encoder Saved")
-
-# ============================================
-# Encode Categorical Columns
-# ============================================
+# ==========================================================
+# Encode Categorical Features
+# ==========================================================
 
 label_encoders = {}
 
@@ -100,38 +93,25 @@ categorical_columns = df.select_dtypes(
 
 for column in categorical_columns:
 
-    if column != "Target":
+    if column == "Target":
+        continue
 
-        encoder = LabelEncoder()
+    encoder = LabelEncoder()
 
-        df[column] = encoder.fit_transform(df[column])
+    df[column] = encoder.fit_transform(df[column])
 
-        label_encoders[column] = encoder
-
-print("Categorical Columns Encoded")
-
-# ============================================
-# Save Label Encoders
-# ============================================
+    label_encoders[column] = encoder
 
 joblib.dump(
     label_encoders,
     "model/label_encoders.pkl"
 )
 
-print("Label Encoders Saved")
+# ==========================================================
+# Split Features & Target
+# ==========================================================
 
-# ============================================
-# Split Features and Target
-# ============================================
-
-X = df.drop("Target", axis=1)
-
-y = df["Target"]
-
-# ============================================
-# Save Feature Names
-# ============================================
+X, y = split_features_target(df)
 
 feature_names = list(X.columns)
 
@@ -140,40 +120,39 @@ joblib.dump(
     "model/feature_names.pkl"
 )
 
-print("Feature Names Saved")
-
-# ============================================
+# ==========================================================
 # Save Default Values
-# ============================================
+# ==========================================================
 
 default_values = {}
 
 for column in X.columns:
 
-    if X[column].dtype == object:
+    if pd.api.types.is_integer_dtype(X[column]):
 
-        default_values[column] = X[column].mode()[0]
+        default_values[column] = int(X[column].median())
+
+    elif pd.api.types.is_float_dtype(X[column]):
+
+        default_values[column] = float(X[column].median())
 
     else:
 
-        default_values[column] = float(
-            X[column].median()
-        )
+        default_values[column] = X[column].mode()[0]
 
 joblib.dump(
     default_values,
     "model/default_values.pkl"
 )
 
-print("Default Values Saved")
-
-# ============================================
-# Train Test Split
-# ============================================
+# ==========================================================
+# Train-Test Split
+# ==========================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
 
     X,
+
     y,
 
     test_size=0.20,
@@ -184,12 +163,12 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 )
 
-print("\nTraining Samples :", len(X_train))
+print("Training Samples :", len(X_train))
 print("Testing Samples  :", len(X_test))
 
-# ============================================
+# ==========================================================
 # Machine Learning Models
-# ============================================
+# ==========================================================
 
 models = {
 
@@ -214,13 +193,13 @@ models = {
 }
 
 best_model = None
-best_model_name = ""
+best_model_name = None
 best_accuracy = 0
 
 results = []
 
 print("\n" + "=" * 60)
-print("Training Machine Learning Models")
+print("Training Models")
 print("=" * 60)
 
 for name, model in models.items():
@@ -239,7 +218,11 @@ for name, model in models.items():
     results.append({
 
         "Model": name,
-        "Accuracy": round(accuracy * 100, 2)
+
+        "Accuracy (%)": round(
+            accuracy * 100,
+            2
+        )
 
     })
 
@@ -253,67 +236,33 @@ for name, model in models.items():
 
         best_model_name = name
 
-print("\n" + "=" * 60)
-print("Model Comparison")
-print("=" * 60)
+# ==========================================================
+# Model Comparison
+# ==========================================================
 
 results_df = pd.DataFrame(results)
 
+results_df.to_csv(
+
+    "model/model_accuracy.csv",
+
+    index=False
+
+)
+
+print("\n")
 print(results_df)
 
 print("\nBest Model :", best_model_name)
-
-print("Best Accuracy :", round(best_accuracy * 100, 2), "%")
-
-# ============================================
-# Final Prediction
-# ============================================
-
-y_pred = best_model.predict(X_test)
-
-# ============================================
-# Classification Report
-# ============================================
-
-print("\n" + "=" * 60)
-print("Classification Report")
-print("=" * 60)
-
-report = classification_report(
-    y_test,
-    y_pred
+print(
+    "Best Accuracy :",
+    round(best_accuracy * 100, 2),
+    "%"
 )
 
-print(report)
-
-with open(
-    "model/classification_report.txt",
-    "w"
-) as file:
-
-    file.write(report)
-
-# ============================================
-# Confusion Matrix
-# ============================================
-
-cm = confusion_matrix(
-    y_test,
-    y_pred
-)
-
-cm_df = pd.DataFrame(cm)
-
-cm_df.to_csv(
-    "model/confusion_matrix.csv",
-    index=False
-)
-
-print("\nConfusion Matrix Saved")
-
-# ============================================
+# ==========================================================
 # Save Best Model
-# ============================================
+# ==========================================================
 
 joblib.dump(
 
@@ -323,33 +272,100 @@ joblib.dump(
 
 )
 
-print("\nBest Model Saved Successfully")
+with open(
 
-# ============================================
-# Save Feature Importance
-# ============================================
+    "model/best_model.txt",
 
-print("\n" + "=" * 60)
-print("Saving Feature Importance")
-print("=" * 60)
+    "w"
 
-if best_model_name == "Random Forest":
+) as file:
+
+    file.write(best_model_name)
+
+# ==========================================================
+# Final Prediction
+# ==========================================================
+
+y_pred = best_model.predict(X_test)
+
+# ==========================================================
+# Classification Report
+# ==========================================================
+
+report = classification_report(
+
+    y_test,
+
+    y_pred,
+
+    target_names=target_encoder.classes_
+
+)
+
+print("\nClassification Report\n")
+
+print(report)
+
+with open(
+
+    "model/classification_report.txt",
+
+    "w"
+
+) as file:
+
+    file.write(report)
+
+# ==========================================================
+# Confusion Matrix
+# ==========================================================
+
+cm = confusion_matrix(
+
+    y_test,
+
+    y_pred
+
+)
+
+cm_df = pd.DataFrame(cm)
+
+cm_df.to_csv(
+
+    "model/confusion_matrix.csv",
+
+    index=False
+
+)
+
+# ==========================================================
+# Feature Importance
+# ==========================================================
+
+if hasattr(best_model, "feature_importances_"):
 
     importance = pd.DataFrame({
 
         "Feature": X.columns,
+
         "Importance": best_model.feature_importances_
 
     })
 
     importance = importance.sort_values(
+
         by="Importance",
+
         ascending=False
+
     )
 
     importance.to_csv(
+
         "model/feature_importance.csv",
+
         index=False
+
     )
 
     print("\nTop 10 Important Features\n")
@@ -359,80 +375,45 @@ if best_model_name == "Random Forest":
 else:
 
     print(
-        "Feature Importance is only available for Random Forest."
+        "\nFeature Importance not available for this model."
     )
 
-# ============================================
-# Save Model Accuracy
-# ============================================
-
-accuracy_df = pd.DataFrame({
-
-    "Best Model": [best_model_name],
-
-    "Accuracy (%)": [
-
-        round(best_accuracy * 100, 2)
-
-    ]
-
-})
-
-accuracy_df.to_csv(
-
-    "model/model_accuracy.csv",
-
-    index=False
-
-)
-
-print("\nModel Accuracy Saved")
-
-# ============================================
-# Training Summary
-# ============================================
+# ==========================================================
+# Training Completed
+# ==========================================================
 
 print("\n" + "=" * 60)
+
 print("TRAINING COMPLETED SUCCESSFULLY")
-print("=" * 60)
-
-print(f"""
-Best Model        : {best_model_name}
-
-Accuracy          : {best_accuracy * 100:.2f} %
-
-Training Samples  : {len(X_train)}
-
-Testing Samples   : {len(X_test)}
-
-Number of Features: {len(feature_names)}
-
-""")
 
 print("=" * 60)
 
-print("Files Saved Successfully")
+print(f"Best Model : {best_model_name}")
 
-print("""
-student_dropout_model.pkl
+print(f"Accuracy   : {best_accuracy * 100:.2f}%")
 
-feature_names.pkl
+print("\nSaved Files")
 
-label_encoders.pkl
+print("--------------------------------------")
 
-target_encoder.pkl
+print("student_dropout_model.pkl")
 
-default_values.pkl
+print("feature_names.pkl")
 
-classification_report.txt
+print("default_values.pkl")
 
-confusion_matrix.csv
+print("target_encoder.pkl")
 
-feature_importance.csv
+print("label_encoders.pkl")
 
-model_accuracy.csv
-""")
+print("classification_report.txt")
 
-print("=" * 60)
-print("Project Ready For Streamlit")
+print("confusion_matrix.csv")
+
+print("feature_importance.csv")
+
+print("model_accuracy.csv")
+
+print("best_model.txt")
+
 print("=" * 60)
