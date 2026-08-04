@@ -1,50 +1,68 @@
+"""
+predict.py
+
+Prediction module for the Student Dropout Prediction System.
+"""
+
 import joblib
 import pandas as pd
 
-# ---------------------------------------
-# Load Saved Objects
-# ---------------------------------------
 
-model = joblib.load("model/student_dropout_model.pkl")
-feature_names = joblib.load("model/feature_names.pkl")
-label_encoders = joblib.load("model/label_encoders.pkl")
-target_encoder = joblib.load("model/target_encoder.pkl")
+MODEL_PATH = "model/student_dropout_model.pkl"
+FEATURE_PATH = "model/feature_names.pkl"
+TARGET_ENCODER_PATH = "model/target_encoder.pkl"
 
 
-def preprocess_input(input_dict):
+class StudentDropoutPredictor:
     """
-    Convert user input into a DataFrame that matches the
-    training data format.
+    Loads the trained model and predicts
+    student academic outcome.
     """
 
-    df = pd.DataFrame([input_dict])
+    def __init__(self):
 
-    # Encode categorical columns if needed
-    for column, encoder in label_encoders.items():
+        self.model = joblib.load(MODEL_PATH)
 
-        if column in df.columns:
+        self.feature_names = joblib.load(FEATURE_PATH)
 
-            df[column] = encoder.transform(df[column])
+        self.target_encoder = joblib.load(TARGET_ENCODER_PATH)
 
-    # Arrange columns exactly like training
-    df = df[feature_names]
+    def predict(self, student_data):
+        """
+        Parameters
+        ----------
+        student_data : dict
 
-    return df
+        Returns
+        -------
+        prediction : str
+        confidence : float
+        """
+
+        df = pd.DataFrame([student_data])
+
+        # Arrange columns exactly as training
+        df = df[self.feature_names]
+
+        prediction = self.model.predict(df)[0]
+
+        probabilities = self.model.predict_proba(df)[0]
+
+        confidence = max(probabilities) * 100
+
+        prediction = self.target_encoder.inverse_transform(
+            [prediction]
+        )[0]
+
+        return prediction, round(confidence, 2)
 
 
-def predict_student(input_dict):
+predictor = StudentDropoutPredictor()
+
+
+def predict_student(student_data):
     """
-    Predict Dropout / Graduate
+    Wrapper function for Streamlit.
     """
 
-    processed_data = preprocess_input(input_dict)
-
-    prediction = model.predict(processed_data)[0]
-
-    probability = model.predict_proba(processed_data)[0]
-
-    confidence = round(max(probability) * 100, 2)
-
-    predicted_label = target_encoder.inverse_transform([prediction])[0]
-
-    return predicted_label, confidence
+    return predictor.predict(student_data)
