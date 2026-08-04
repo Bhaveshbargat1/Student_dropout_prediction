@@ -145,3 +145,21 @@ joblib.dump(label_encoders, "model/label_encoders.pkl")
 joblib.dump(list(X.columns), "model/feature_names.pkl")
 
 print("\nModel Saved Successfully!")
+
+# -----------------------------------
+# Save Default Values
+# -----------------------------------
+
+default_values = {}
+
+for column in X.columns:
+
+    if X[column].dtype in ["int64", "float64"]:
+
+        default_values[column] = X[column].median()
+
+    else:
+
+        default_values[column] = X[column].mode()[0]
+
+joblib.dump(default_values, "model/default_values.pkl")
