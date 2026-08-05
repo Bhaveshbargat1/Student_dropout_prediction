@@ -1,258 +1,67 @@
-"""
-helper.py
-
-Reusable Streamlit helper functions for the
-Student Dropout Prediction System.
-"""
-
-import streamlit as st
+import joblib
 import pandas as pd
-import plotly.express as px
+import numpy as np
 
+def load_artifacts():
+    """Load all saved artifacts from model/ folder."""
+    model = joblib.load('model/student_dropout_model.pkl')
+    scaler = joblib.load('model/scaler.pkl')
+    encoders = joblib.load('model/encoders.pkl')
+    label_encoder = joblib.load('model/target_encoder.pkl')
+    num_cols = joblib.load('model/num_cols.pkl')
+    cat_cols = joblib.load('model/cat_cols.pkl')
+    default_values = joblib.load('model/default_values.pkl')
+    feature_names = joblib.load('model/feature_names.pkl')
+    return model, scaler, encoders, label_encoder, num_cols, cat_cols, default_values, feature_names
 
-# ==========================================================
-# Message Functions
-# ==========================================================
+def safe_transform(encoder, values):
+    """Transform values, mapping unseen categories to the mode (0) of training."""
+    classes = list(encoder.classes_)
+    def map_value(x):
+        if str(x) in classes:
+            return classes.index(str(x))
+        else:
+            return 0  # default for unseen
+    return [map_value(v) for v in values]
 
-def show_success(message):
-    """Display success message."""
-    st.success(message)
-
-
-def show_error(message):
-    """Display error message."""
-    st.error(message)
-
-
-def show_warning(message):
-    """Display warning message."""
-    st.warning(message)
-
-
-def show_info(message):
-    """Display info message."""
-    st.info(message)
-
-
-# ==========================================================
-# Dataset Preview
-# ==========================================================
-
-def display_dataset(df, rows=10):
+def preprocess_raw_input(raw_dict, encoders, scaler, num_cols, cat_cols, default_values):
     """
-    Display dataset preview.
+    Convert raw input dictionary to a preprocessed DataFrame.
+    Handles missing values by filling with defaults.
     """
-    st.dataframe(
-        df.head(rows),
-        use_container_width=True
-    )
-
-
-# ==========================================================
-# Dataset Statistics
-# ==========================================================
-
-def display_dataset_info(info):
-    """
-    Display dataset statistics.
-    """
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric(
-        "Rows",
-        info["rows"]
-    )
-
-    col2.metric(
-        "Columns",
-        info["columns"]
-    )
-
-    col3.metric(
-        "Missing",
-        info["missing_values"]
-    )
-
-    col4.metric(
-        "Duplicates",
-        info["duplicate_rows"]
-    )
-
-
-# ==========================================================
-# Target Distribution
-# ==========================================================
-
-def plot_target_distribution(target_counts):
-    """
-    Plot class distribution.
-    """
-
-    chart_df = pd.DataFrame({
-
-        "Class": target_counts.index,
-
-        "Count": target_counts.values
-
-    })
-
-    fig = px.bar(
-
-        chart_df,
-
-        x="Class",
-
-        y="Count",
-
-        color="Class",
-
-        text="Count",
-
-        title="Student Target Distribution"
-
-    )
-
-    fig.update_traces(
-        textposition="outside"
-    )
-
-    fig.update_layout(
-
-        xaxis_title="Target",
-
-        yaxis_title="Students",
-
-        height=500
-
-    )
-
-    st.plotly_chart(
-
-        fig,
-
-        use_container_width=True
-
-    )
-
-
-# ==========================================================
-# Feature Importance
-# ==========================================================
-
-def plot_feature_importance(feature_df):
-    """
-    Display top feature importance.
-    """
-
-    feature_df = feature_df.sort_values(
-
-        by="Importance",
-
-        ascending=False
-
-    ).head(15)
-
-    fig = px.bar(
-
-        feature_df,
-
-        x="Importance",
-
-        y="Feature",
-
-        orientation="h",
-
-        text="Importance",
-
-        title="Top 15 Important Features"
-
-    )
-
-    fig.update_layout(
-
-        yaxis=dict(
-
-            categoryorder="total ascending"
-
-        ),
-
-        height=650
-
-    )
-
-    st.plotly_chart(
-
-        fig,
-
-        use_container_width=True
-
-    )
-
-
-# ==========================================================
-# Model Comparison
-# ==========================================================
-
-def show_model_accuracy(df):
-    """
-    Display model comparison table.
-    """
-
-    st.dataframe(
-
-        df,
-
-        use_container_width=True,
-
-        hide_index=True
-
-    )
-
-
-# ==========================================================
-# Prediction Result
-# ==========================================================
-
-def show_prediction(prediction, confidence):
-    """
-    Display prediction result.
-    """
-
-    st.subheader("Prediction")
-
-    if prediction == "Graduate":
-
-        st.success(
-            "🎉 Student is likely to Graduate"
-        )
-
-    else:
-
-        st.error(
-            "⚠️ Student is likely to Dropout"
-        )
-
-    st.metric(
-
-        "Confidence",
-
-        f"{confidence:.2f}%"
-
-    )
-
-
-# ==========================================================
-# Footer
-# ==========================================================
-
-def show_footer():
-
-    st.markdown("---")
-
-    st.caption(
-
-        "Student Dropout Prediction System | "
-        "Developed using Streamlit & Scikit-Learn"
-
-    )
+    # Create a copy to avoid modifying input
+    data = raw_dict.copy()
+    
+    # Fill missing with defaults for categorical
+    for col in cat_cols:
+        if col not in data or pd.isna(data[col]):
+            data[col] = default_values['cat'][col]
+        else:
+            data[col] = str(data[col])
+    
+    # Fill missing with defaults for numerical
+    for col in num_cols:
+        if col not in data or pd.isna(data[col]):
+            data[col] = default_values['num'][col]
+        else:
+            data[col] = float(data[col])
+    
+    # Create DataFrame
+    input_df = pd.DataFrame([data])
+    
+    # Encode categorical columns
+    for col in cat_cols:
+        input_df[col] = safe_transform(encoders[col], input_df[col].tolist())
+    
+    # Scale numerical columns
+    input_df[num_cols] = scaler.transform(input_df[num_cols])
+    
+    return input_df
+
+def predict_single(raw_dict, model, scaler, encoders, label_encoder, num_cols, cat_cols, default_values):
+    """Make a single prediction from raw input dictionary."""
+    input_df = preprocess_raw_input(raw_dict, encoders, scaler, num_cols, cat_cols, default_values)
+    pred_encoded = model.predict(input_df)[0]
+    pred_label = label_encoder.inverse_transform([pred_encoded])[0]
+    probs = model.predict_proba(input_df)[0] if hasattr(model, 'predict_proba') else None
+    return pred_label, probs
