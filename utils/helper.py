@@ -1,8 +1,8 @@
 """
 helper.py
 
-Reusable helper functions for the Student Dropout Prediction
-Streamlit application.
+Reusable Streamlit helper functions for the
+Student Dropout Prediction System.
 """
 
 import streamlit as st
@@ -10,9 +10,9 @@ import pandas as pd
 import plotly.express as px
 
 
-# ======================================================
+# ==========================================================
 # Message Functions
-# ======================================================
+# ==========================================================
 
 def show_success(message):
     """Display success message."""
@@ -30,68 +30,100 @@ def show_warning(message):
 
 
 def show_info(message):
-    """Display information message."""
+    """Display info message."""
     st.info(message)
 
 
-# ======================================================
-# Dataset Functions
-# ======================================================
+# ==========================================================
+# Dataset Preview
+# ==========================================================
 
 def display_dataset(df, rows=10):
     """
     Display dataset preview.
     """
-    st.dataframe(df.head(rows), use_container_width=True)
+    st.dataframe(
+        df.head(rows),
+        use_container_width=True
+    )
 
 
-def display_dataset_info(df):
+# ==========================================================
+# Dataset Statistics
+# ==========================================================
+
+def display_dataset_info(info):
     """
     Display dataset statistics.
     """
 
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("Rows", df.shape[0])
-    col2.metric("Columns", df.shape[1])
-    col3.metric("Missing Values", df.isnull().sum().sum())
-    col4.metric("Duplicate Rows", df.duplicated().sum())
+    col1.metric(
+        "Rows",
+        info["rows"]
+    )
+
+    col2.metric(
+        "Columns",
+        info["columns"]
+    )
+
+    col3.metric(
+        "Missing",
+        info["missing_values"]
+    )
+
+    col4.metric(
+        "Duplicates",
+        info["duplicate_rows"]
+    )
 
 
-# ======================================================
-# Charts
-# ======================================================
+# ==========================================================
+# Target Distribution
+# ==========================================================
 
-def plot_target_distribution(df):
+def plot_target_distribution(target_counts):
     """
-    Plot target distribution.
+    Plot class distribution.
     """
 
-    counts = df["Target"].value_counts().reset_index()
+    chart_df = pd.DataFrame({
 
-    counts.columns = ["Target", "Count"]
+        "Class": target_counts.index,
+
+        "Count": target_counts.values
+
+    })
 
     fig = px.bar(
 
-        counts,
+        chart_df,
 
-        x="Target",
+        x="Class",
 
         y="Count",
 
-        color="Target",
+        color="Class",
 
         text="Count",
 
-        title="Target Class Distribution"
+        title="Student Target Distribution"
 
+    )
+
+    fig.update_traces(
+        textposition="outside"
     )
 
     fig.update_layout(
 
-        xaxis_title="Student Status",
+        xaxis_title="Target",
 
-        yaxis_title="Number of Students"
+        yaxis_title="Students",
+
+        height=500
 
     )
 
@@ -104,14 +136,26 @@ def plot_target_distribution(df):
     )
 
 
+# ==========================================================
+# Feature Importance
+# ==========================================================
+
 def plot_feature_importance(feature_df):
     """
-    Display feature importance chart.
+    Display top feature importance.
     """
+
+    feature_df = feature_df.sort_values(
+
+        by="Importance",
+
+        ascending=False
+
+    ).head(15)
 
     fig = px.bar(
 
-        feature_df.head(10),
+        feature_df,
 
         x="Importance",
 
@@ -119,13 +163,21 @@ def plot_feature_importance(feature_df):
 
         orientation="h",
 
-        title="Top 10 Important Features"
+        text="Importance",
+
+        title="Top 15 Important Features"
 
     )
 
     fig.update_layout(
 
-        yaxis={"categoryorder": "total ascending"}
+        yaxis=dict(
+
+            categoryorder="total ascending"
+
+        ),
+
+        height=650
 
     )
 
@@ -138,41 +190,69 @@ def plot_feature_importance(feature_df):
     )
 
 
-# ======================================================
+# ==========================================================
+# Model Comparison
+# ==========================================================
+
+def show_model_accuracy(df):
+    """
+    Display model comparison table.
+    """
+
+    st.dataframe(
+
+        df,
+
+        use_container_width=True,
+
+        hide_index=True
+
+    )
+
+
+# ==========================================================
 # Prediction Result
-# ======================================================
+# ==========================================================
 
 def show_prediction(prediction, confidence):
     """
     Display prediction result.
     """
 
-    st.subheader("Prediction Result")
+    st.subheader("Prediction")
 
     if prediction == "Graduate":
 
-        st.success("🎉 Student is likely to Graduate")
+        st.success(
+            "🎉 Student is likely to Graduate"
+        )
 
     else:
 
-        st.error("⚠ Student is likely to Dropout")
+        st.error(
+            "⚠️ Student is likely to Dropout"
+        )
 
     st.metric(
 
-        "Confidence Score",
+        "Confidence",
 
         f"{confidence:.2f}%"
 
     )
 
-    if confidence >= 90:
 
-        st.success("Risk Assessment: High Confidence")
+# ==========================================================
+# Footer
+# ==========================================================
 
-    elif confidence >= 70:
+def show_footer():
 
-        st.warning("Risk Assessment: Medium Confidence")
+    st.markdown("---")
 
-    else:
+    st.caption(
 
-        st.info("Risk Assessment: Low Confidence")
+        "Student Dropout Prediction System | "
+        "Developed using Streamlit & Scikit-Learn"
+
+    )
