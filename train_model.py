@@ -1,152 +1,120 @@
-"""
-train_model.py
-
-Train and save the best model for the
-Student Dropout Prediction System.
-"""
-
-import os
-import warnings
-import joblib
 import pandas as pd
-
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-
+import numpy as np
+import joblib
+import os
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import (
-    RandomForestClassifier,
-    GradientBoostingClassifier
-)
+from xgboost import XGBClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from utils.preprocessing import load_data, preprocess_data
 
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix
-)
+def save_model_artifacts(model, scaler, encoders, label_encoder,
+                         num_cols, cat_cols, default_values,
+                         feature_names, model_name, accuracy,
+                         classification_report_dict, confusion_matrix,
+                         feature_importance=None):
+    """Save all model artifacts and evaluation results."""
+    os.makedirs('model', exist_ok=True)
+    
+    joblib.dump(model, 'model/student_dropout_model.pkl')
+    joblib.dump(scaler, 'model/scaler.pkl')
+    joblib.dump(encoders, 'model/encoders.pkl')
+    joblib.dump(label_encoder, 'model/target_encoder.pkl')
+    joblib.dump(num_cols, 'model/num_cols.pkl')
+    joblib.dump(cat_cols, 'model/cat_cols.pkl')
+    joblib.dump(default_values, 'model/default_values.pkl')
+    joblib.dump(feature_names, 'model/feature_names.pkl')
+    
+    # Save best model info
+    with open('model/best_model.txt', 'w') as f:
+        f.write(f"Best Model: {model_name}\n")
+        f.write(f"Test Accuracy: {accuracy:.4f}\n")
+    
+    # Save accuracy
+    pd.DataFrame({'Model': [model_name], 'Accuracy': [accuracy]}).to_csv('model/model_accuracy.csv', index=False)
+    
+    # Save classification report as CSV and TXT
+    if classification_report_dict:
+        df_report = pd.DataFrame(classification_report_dict).transpose()
+        df_report.to_csv('model/classification_report.csv')
+        with open('model/classification_report.txt', 'w') as f:
+            f.write(str(classification_report_dict))
+    
+    # Save confusion matrix
+    if confusion_matrix is not None:
+        pd.DataFrame(confusion_matrix).to_csv('model/confusion_matrix.csv', index=False)
+    
+    # Save feature importance if available
+    if feature_importance is not None:
+        fi_df = pd.DataFrame({'Feature': feature_names, 'Importance': feature_importance})
+        fi_df = fi_df.sort_values('Importance', ascending=False)
+        fi_df.to_csv('model/feature_importance.csv', index=False)
 
-from utils.preprocessing import (
-    load_dataset,
-    validate_dataset,
-    remove_missing_values,
-    remove_enrolled_students,
-    split_features_target
-)
-
-warnings.filterwarnings("ignore")
-
-# ==========================================================
-# Paths
-# ==========================================================
-
-DATA_PATH = "data/data.csv"
-MODEL_DIR = "model"
-
-os.makedirs(MODEL_DIR, exist_ok=True)
-
-# ==========================================================
-# Load and Prepare Data
-# ==========================================================
-
-def load_and_prepare_data():
-
-    df = load_dataset(DATA_PATH)
-
-    validate_dataset(df)
-
-    df = remove_missing_values(df)
-
-    df = remove_enrolled_students(df)
-
-    target_encoder = LabelEncoder()
-
-    df["Target"] = target_encoder.fit_transform(df["Target"])
-
-    X, y = split_features_target(df)
-
-    feature_names = list(X.columns)
-
-    default_values = {}
-
-    for column in X.columns:
-
-        if pd.api.types.is_integer_dtype(X[column]):
-
-            default_values[column] = int(X[column].median())
-
-        else:
-
-            default_values[column] = float(X[column].median())
-
-    X_train, X_test, y_train, y_test = train_test_split(
-
-        X,
-
-        y,
-
-        test_size=0.20,
-
-        random_state=42,
-
-        stratify=y
-
-    )
-
-    return (
-
-        X_train,
-
-        X_test,
-
-        y_train,
-
-        y_test,
-
-        feature_names,
-
-        default_values,
-
-        target_encoder
-
-    )
-
-# ==========================================================
-# Train Models
-# ==========================================================
-
-def train_models(X_train, y_train):
-
+def train_and_save():
+    # Load data
+    df = load_data('data/data.csv')
+    
+    # Preprocess
+    (X_train, X_test, y_train, y_test,
+     encoders, scaler, label_encoder,
+     num_cols, cat_cols, default_values) = preprocess_data(df)
+    
+    # Get feature names
+    feature_names = X_train.columns.tolist()
+    
+    # Define models
     models = {
-
-        "Logistic Regression": LogisticRegression(
-
-            max_iter=2000,
-
-            random_state=42
-
-        ),
-
-        "Decision Tree": DecisionTreeClassifier(
-
-            random_state=42
-
-        ),
-
-        "Random Forest": RandomForestClassifier(
-
-            n_estimators=300,
-
-            random_state=42
-
-        ),
-
-        "Gradient Boosting": GradientBoostingClassifier(
-
-            random_state=42
-
-        )
-
+        'LogisticRegression': LogisticRegression(max_iter=1000, random_state=42),
+        'RandomForest': RandomForestClassifier(n_estimators=100, random_state=42),
+        'XGBoost': XGBClassifier(n_estimators=100, random_state=42, use_label_encoder=False, eval_metric='mlogloss')
     }
+    
+    best_model = None
+    best_acc = 0.0
+    best_name = ''
+    best_report = None
+    best_cm = None
+    best_fi = None
+    
+    for name, model in models.items():
+        print(f"Training {name}...")
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+        report = classification_report(y_test, y_pred, output_dict=True, target_names=label_encoder.classes_)
+        cm = confusion_matrix(y_test, y_pred)
+        print(f"{name} Accuracy: {acc:.4f}")
+        if acc > best_acc:
+            best_acc = acc
+            best_model = model
+            best_name = name
+            best_report = report
+            best_cm = cm
+            if hasattr(model, 'feature_importances_'):
+                best_fi = model.feature_importances_
+            else:
+                best_fi = None
+    
+    print(f"\nBest model: {best_name} with accuracy {best_acc:.4f}")
+    
+    # Save all artifacts
+    save_model_artifacts(
+        model=best_model,
+        scaler=scaler,
+        encoders=encoders,
+        label_encoder=label_encoder,
+        num_cols=num_cols,
+        cat_cols=cat_cols,
+        default_values=default_values,
+        feature_names=feature_names,
+        model_name=best_name,
+        accuracy=best_acc,
+        classification_report_dict=best_report,
+        confusion_matrix=best_cm,
+        feature_importance=best_fi
+    )
+    
+    print("All artifacts saved successfully in the 'model/' folder.")
 
-    return models
+if __name__ == '__main__':
+    train_and_save()
