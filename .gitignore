@@ -1,8 +1,22 @@
+# Python
 __pycache__/
 *.pyc
-*.pkl
-*.log
-.venv/
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
 env/
-data/*.csv
-model/*.pkl
+
+# Flask
+instance/
+
+# VS Code
+.vscode/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
