@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E-Commerce Recommendation System</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Poppins',sans-serif;
+}
+
+body{
+background:#f6f7fb;
+}
+
+.navbar{
+background:white;
+padding:18px 60px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+box-shadow:0 3px 10px rgba(0,0,0,.08);
+}
+
+.logo{
+font-size:28px;
+font-weight:700;
+color:#16a34a;
+}
+
+.logo span{
+color:#facc15;
+}
+
+.search{
+width:420px;
+}
+
+.search input{
+width:100%;
+padding:14px;
+border-radius:10px;
+border:none;
+background:#f2f2f2;
+font-size:15px;
+}
+
+.hero{
+background:linear-gradient(90deg,#16a34a,#65a30d);
+color:white;
+padding:70px;
+text-align:center;
+}
+
+.hero h1{
+font-size:42px;
+margin-bottom:15px;
+}
+
+.hero p{
+font-size:18px;
+opacity:.9;
+}
+
+.container{
+width:90%;
+margin:auto;
+margin-top:-40px;
+}
+
+.form-box{
+
+background:white;
+padding:30px;
+border-radius:18px;
+box-shadow:0 10px 25px rgba(0,0,0,.08);
+
+display:flex;
+gap:20px;
+align-items:center;
+
+}
+
+.form-box input{
+
+flex:1;
+padding:15px;
+border-radius:10px;
+border:1px solid #ddd;
+font-size:16px;
+
+}
+
+.form-box button{
+
+padding:15px 35px;
+background:#16a34a;
+color:white;
+font-size:16px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+transition:.3s;
+
+}
+
+.form-box button:hover{
+
+background:#15803d;
+
+}
+
+.section-title{
+
+margin:40px 0 25px;
+font-size:28px;
+font-weight:600;
+
+}
+
+.products{
+
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+gap:25px;
+
+}
+
+.card{
+
+background:white;
+border-radius:18px;
+padding:18px;
+box-shadow:0 8px 20px rgba(0,0,0,.08);
+transition:.3s;
+
+}
+
+.card:hover{
+
+transform:translateY(-8px);
+
+}
+
+.card img{
+    width:100%;
+    height:180px;
+    object-fit:contain;
+    padding:15px;
+    background:#fafafa;
+    border-radius:12px;
+}
+
+.card h3{
+
+margin-top:15px;
+
+}
+
+.price{
+
+font-size:20px;
+font-weight:700;
+color:#16a34a;
+margin-top:10px;
+
+}
+
+.rating{
+
+color:#f59e0b;
+margin-top:8px;
+
+}
+
+button.cart{
+
+margin-top:15px;
+width:100%;
+padding:12px;
+background:#facc15;
+border:none;
+font-weight:600;
+border-radius:8px;
+cursor:pointer;
+
+}
+
+.footer{
+
+margin-top:80px;
+padding:30px;
+text-align:center;
+background:white;
+color:#777;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="navbar">
+
+<div class="logo">
+
+Quick<span>Cart</span>
+
+</div>
+
+<div class="search">
+
+<input placeholder="Search products...">
+
+</div>
+
+</div>
+
+<div class="hero">
+
+<h1>Smart Product Recommendation</h1>
+
+<p>Get AI-powered recommendations based on your shopping cart.</p>
+
+</div>
+
+<div class="container">
+
+<form method="POST">
+
+<div class="form-box">
+
+<input
+type="text"
+name="cart"
+placeholder="Example : Bread, Milk or Laptop"
+required>
+
+<button>
+
+Recommend
+
+</button>
+
+</div>
+
+</form>
+
+{% if recommendations %}
+
+<h2 class="section-title">
+
+Recommended For You
+
+</h2>
+
+<div class="products">
+
+{% for item in recommendations %}
+
+<div class="card">
+
+<img src="{{ url_for('static', filename='images/' + product_images.get(item, 'default.jpg')) }}" alt="{{ item }}">
+
+<h3>{{ item }}</h3>
+
+<p style="color:gray;font-size:14px;">
+Premium Quality Product
+</p>
+
+<div class="price">
+₹ {{ loop.index*120+199 }}
+</div>
+
+<div class="rating">
+⭐⭐⭐⭐⭐ (4.8)
+</div>
+
+<p style="color:green;font-size:14px;">
+⚡ Delivery in 10 mins
+</p>
+
+<button class="cart">
+🛒 Add to Cart
+</button>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endif %}
+
+</div>
+
+<div class="footer">
+
+© 2026 QuickCart Recommendation System
+
+</div>
+
+</body>
+</html>
